@@ -9,7 +9,7 @@ cloudinary.config({
 });
 
 
-export async function uploadfile(path) {
+export async function uploadFile(path) {
     try {
         // Upload file on cloudinary
         const uploadResult = await cloudinary.uploader.upload(path, {
