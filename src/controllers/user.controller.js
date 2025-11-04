@@ -4,7 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadFile } from "../utils/fileUpload.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import fs from "fs";
-export const registerUser = asyncHandler(async (req, res, next) => {
+export const registerUser = asyncHandler(async (req, res) => {
     const { username, email, fullName, password } = req.body;
 
     if (
@@ -56,4 +56,47 @@ export const registerUser = asyncHandler(async (req, res, next) => {
         throw new ApiError(500, "Unable to fetch user after creation");
     }
     res.status(201).json(new ApiResponse(201, responseUser, "User registered successfully"));
+});
+
+
+// Login Controller
+
+export const loginUser = asyncHandler(async (req, res) => {
+    const { username, password } = req.body;
+
+    if ([username, password].some((field) => field.trim() === "")) {
+        throw new ApiError(409, "Username or Password are required");
+    }
+    const user = await User.findOne({ username: username.toLowerCase() });
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid Credentials");
+    }
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+    user.refreshToken = refreshToken;
+    await user.save();
+
+
+    // Send the Response to the User 
+    return res.status(200).cookie("accessToken", accessToken, { httpOnly: true, secure: true })
+        .cookie("refreshToken", refreshToken, { httpOnly: true, secure: true })
+        .json(new ApiResponse(200, {...user._doc, password: undefined, refreshToken: undefined}, "User logged in successfully"));
+});
+
+export const logoutUser = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+    user.refreshToken = undefined;
+    await user.save({ validateBeforeSave: false });
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    res.status(200).json(new ApiResponse(200, {}, "User logged out successfully"));
 });
