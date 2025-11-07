@@ -4,6 +4,9 @@ import { User } from "../models/user.model.js";
 import { uploadFile } from "../utils/fileUpload.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import fs from "fs";
+
+
+// Registration Controller
 export const registerUser = asyncHandler(async (req, res) => {
     const { username, email, fullName, password } = req.body;
 
@@ -85,9 +88,10 @@ export const loginUser = asyncHandler(async (req, res) => {
     // Send the Response to the User 
     return res.status(200).cookie("accessToken", accessToken, { httpOnly: true, secure: true })
         .cookie("refreshToken", refreshToken, { httpOnly: true, secure: true })
-        .json(new ApiResponse(200, {...user._doc, password: undefined, refreshToken: undefined}, "User logged in successfully"));
+        .json(new ApiResponse(200, { ...user._doc, password: undefined, refreshToken: undefined }, "User logged in successfully"));
 });
 
+// Logout Controller
 export const logoutUser = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const user = await User.findById(userId);
@@ -99,4 +103,30 @@ export const logoutUser = asyncHandler(async (req, res) => {
     res.clearCookie("accessToken");
     res.clearCookie("refreshToken");
     res.status(200).json(new ApiResponse(200, {}, "User logged out successfully"));
+});
+
+// Refresh Access Token Controller
+export const refreshAccessToken = asyncHandler(async (req, res) => {
+    try {
+
+        const refreshToken = req.cookies.refreshToken || req.header("Authorization")?.split(" ")[1] || req.body.refreshToken;
+        if (!refreshToken) {
+            throw new ApiError(401, "Refresh Token is not provided");
+        }
+        const user = await User.findOne({ refreshToken });
+        if (!user) {
+            throw new ApiError(401, "Invalid Refresh Token");
+        }
+        const newAccessToken = user.generateAccessToken();
+        const newRefreshToken = user.generateRefreshToken();
+        user.refreshToken = newRefreshToken;
+        await user.save({ validateBeforeSave: false }); 
+        res.status(200).cookie("accessToken", newAccessToken, { httpOnly: true, secure: true })
+            .cookie("refreshToken", newRefreshToken, { httpOnly: true, secure: true })
+            .json(new ApiResponse(200, { accessToken: newAccessToken }, "Access Token refreshed successfully"));
+        
+    } catch (error) {
+        console.error("Error refreshing access token:", error);
+        throw new ApiError(500, "Error refreshing access token");
+    }
 });

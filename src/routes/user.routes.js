@@ -1,8 +1,7 @@
 import { Router } from "express";
-import { registerUser, loginUser } from "../controllers/user.controller.js";
+import { registerUser, loginUser, logoutUser, refreshAccessToken } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyToken } from "../middlewares/auth.middleware.js";
-import { logoutUser } from "../controllers/user.controller.js";
 const router = Router();
 
 router.route("/register").post(
@@ -26,5 +25,10 @@ router.route("/login").post(
 router.route("/logout").post(
     verifyToken,
     logoutUser
+);
+
+router.route("/refresh-token").post(
+    // No authentication middleware here, as this is for refreshing tokens
+    refreshAccessToken
 );
 export default router;
